@@ -12,6 +12,7 @@ import time
 
 import config
 from console import say
+from detectors.florence2_smoke_fire_detector import Florence2SmokeFireDetector
 from detectors.gguf_vlm_smoke_fire_detector import GgufVlmSmokeFireDetector
 from detectors.moondream_onnx_smoke_fire_detector import MoondreamOnnxSmokeFireDetector
 from detectors.smoke_and_fire_detector import SmokeAndFireDetector
@@ -42,6 +43,10 @@ MODEL_ALIASES = {
     "qwen35": "qwen35_0_8b",
     "qwen35-0.8b": "qwen35_0_8b",
     "qwen35_0_8b": "qwen35_0_8b",
+    "florence2": "florence2_base",
+    "florence-2-base": "florence2_base",
+    "florence2-base": "florence2_base",
+    "florence2_base": "florence2_base",
     "all": "all",
 }
 
@@ -122,6 +127,13 @@ def make_detection(model_key):
             ),
         )
 
+    if model_key == "florence2_base":
+        return DetectionWrapper(
+            "florence2_base",
+            fps,
+            Florence2SmokeFireDetector(),
+        )
+
     raise ValueError(f"no factory for model '{model_key}'")
 
 
@@ -143,6 +155,8 @@ def build_detections_from_env():
         detections.append(make_detection("moondream_onnx"))
     if config.QWEN35_ENABLED:
         detections.append(make_detection("qwen35_0_8b"))
+    if config.FLORENCE2_ENABLED:
+        detections.append(make_detection("florence2_base"))
 
     return detections
 

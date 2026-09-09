@@ -67,6 +67,12 @@ MOONDREAM_MODEL_PATH = os.getenv(
 QWEN35_ENABLED = _enabled("QWEN35_ENABLED", "false")
 QWEN35_MODEL = os.getenv("QWEN35_MODEL", "Qwen/Qwen3.5-0.8B")
 
+FLORENCE2_ENABLED = _enabled("FLORENCE2_ENABLED", "false")
+FLORENCE2_MODEL = os.getenv("FLORENCE2_MODEL", "microsoft/Florence-2-base")
+FLORENCE2_TASK = os.getenv("FLORENCE2_TASK", "<OD>")
+FLORENCE2_OV_CATEGORIES = os.getenv("FLORENCE2_OV_CATEGORIES", "smoke,fire")
+FLORENCE2_MAX_NEW_TOKENS = int(os.getenv("FLORENCE2_MAX_NEW_TOKENS", "256"))
+
 # Legacy single-model settings (still read by older docs)
 SMOLVLM2_ENABLED = _enabled("SMOLVLM2_ENABLED", "true")
 SMOLVLM2_MODEL_PATH = os.getenv("SMOLVLM2_MODEL_PATH", SMOLVLM2_500M_MODEL)

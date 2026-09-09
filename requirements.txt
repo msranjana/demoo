@@ -8,6 +8,8 @@ torch>=2.0
 transformers>=4.45
 pillow>=10.0
 torchvision>=0.20
+timm>=0.9
+einops>=0.7
 num2words>=0.5
 huggingface-hub>=1.5.0
 # Moondream2 ONNX (optional — only needed for python main.py moondream)
