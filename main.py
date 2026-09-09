@@ -38,6 +38,10 @@ MODEL_ALIASES = {
     "moondream2": "moondream_onnx",
     "moondream-onnx": "moondream_onnx",
     "moondream_onnx": "moondream_onnx",
+    "qwen3.5-0.8b": "qwen35_0_8b",
+    "qwen35": "qwen35_0_8b",
+    "qwen35-0.8b": "qwen35_0_8b",
+    "qwen35_0_8b": "qwen35_0_8b",
     "all": "all",
 }
 
@@ -107,6 +111,17 @@ def make_detection(model_key):
             MoondreamOnnxSmokeFireDetector(),
         )
 
+    if model_key == "qwen35_0_8b":
+        return DetectionWrapper(
+            "qwen35_0_8b",
+            fps,
+            TransformersVlmSmokeFireDetector(
+                model_id=config.QWEN35_MODEL,
+                label="qwen3.5-0.8b",
+                trust_remote_code=True,
+            ),
+        )
+
     raise ValueError(f"no factory for model '{model_key}'")
 
 
@@ -126,6 +141,8 @@ def build_detections_from_env():
         detections.append(make_detection("gguf_smolvlm2_256m"))
     if config.MOONDREAM_ENABLED:
         detections.append(make_detection("moondream_onnx"))
+    if config.QWEN35_ENABLED:
+        detections.append(make_detection("qwen35_0_8b"))
 
     return detections
 

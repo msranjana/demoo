@@ -64,6 +64,9 @@ MOONDREAM_MODEL_PATH = os.getenv(
     "MOONDREAM_MODEL_PATH", "models/moondream/moondream-0_5b-int4.mf.gz"
 )
 
+QWEN35_ENABLED = _enabled("QWEN35_ENABLED", "false")
+QWEN35_MODEL = os.getenv("QWEN35_MODEL", "Qwen/Qwen3.5-0.8B")
+
 # Legacy single-model settings (still read by older docs)
 SMOLVLM2_ENABLED = _enabled("SMOLVLM2_ENABLED", "true")
 SMOLVLM2_MODEL_PATH = os.getenv("SMOLVLM2_MODEL_PATH", SMOLVLM2_500M_MODEL)

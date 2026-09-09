@@ -11,20 +11,35 @@ from detectors.vlm_smoke_fire_base import VlmSmokeFireDetectorBase
 class TransformersVlmSmokeFireDetector(VlmSmokeFireDetectorBase):
     """Runs any AutoModelForImageTextToText VLM with the shared smoke/fire prompt."""
 
-    def __init__(self, model_id, label=None, max_new_tokens=16, torch_dtype=None, **kwargs):
+    def __init__(
+        self,
+        model_id,
+        label=None,
+        max_new_tokens=16,
+        torch_dtype=None,
+        trust_remote_code=False,
+        attn_implementation="eager",
+        **kwargs,
+    ):
         super().__init__(model_id=model_id, label=label, **kwargs)
         self.max_new_tokens = max_new_tokens
         self.torch_dtype = torch_dtype or torch.float32
+        self.trust_remote_code = trust_remote_code
+        self.attn_implementation = attn_implementation
         self._processor = None
         self._model = None
 
     def on_start(self):
         self.log(f"loading {self.label} from {self.model_id} (CPU)...")
-        self._processor = AutoProcessor.from_pretrained(self.model_id)
+        self._processor = AutoProcessor.from_pretrained(
+            self.model_id,
+            trust_remote_code=self.trust_remote_code,
+        )
         self._model = AutoModelForImageTextToText.from_pretrained(
             self.model_id,
             torch_dtype=self.torch_dtype,
-            _attn_implementation="eager",
+            trust_remote_code=self.trust_remote_code,
+            _attn_implementation=self.attn_implementation,
         )
         self._model.eval()
         self.log(f"model loaded: {self.label}")
