@@ -13,6 +13,7 @@ import time
 import config
 from console import say
 from detectors.gguf_vlm_smoke_fire_detector import GgufVlmSmokeFireDetector
+from detectors.moondream_onnx_smoke_fire_detector import MoondreamOnnxSmokeFireDetector
 from detectors.smoke_and_fire_detector import SmokeAndFireDetector
 from detectors.transformers_vlm_smoke_fire_detector import TransformersVlmSmokeFireDetector
 from engines.alert_engine import AlertEngine
@@ -33,6 +34,10 @@ MODEL_ALIASES = {
     "gguf": "gguf_smolvlm2_256m",
     "gguf-smolvlm2-256m": "gguf_smolvlm2_256m",
     "gguf_smolvlm2_256m": "gguf_smolvlm2_256m",
+    "moondream": "moondream_onnx",
+    "moondream2": "moondream_onnx",
+    "moondream-onnx": "moondream_onnx",
+    "moondream_onnx": "moondream_onnx",
     "all": "all",
 }
 
@@ -95,6 +100,13 @@ def make_detection(model_key):
             ),
         )
 
+    if model_key == "moondream_onnx":
+        return DetectionWrapper(
+            "moondream_onnx",
+            fps,
+            MoondreamOnnxSmokeFireDetector(),
+        )
+
     raise ValueError(f"no factory for model '{model_key}'")
 
 
@@ -112,6 +124,8 @@ def build_detections_from_env():
         detections.append(make_detection("internvl3_1b"))
     if config.GGUF_ENABLED:
         detections.append(make_detection("gguf_smolvlm2_256m"))
+    if config.MOONDREAM_ENABLED:
+        detections.append(make_detection("moondream_onnx"))
 
     return detections
 

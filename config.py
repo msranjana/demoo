@@ -54,6 +54,16 @@ GGUF_MODEL_ID = os.getenv(
 GGUF_SERVER_URL = os.getenv("GGUF_SERVER_URL", "http://127.0.0.1:8080")
 GGUF_TIMEOUT = int(os.getenv("GGUF_TIMEOUT", "120"))
 
+MOONDREAM_ENABLED = _enabled("MOONDREAM_ENABLED", "false")
+MOONDREAM_REPO_ID = os.getenv("MOONDREAM_REPO_ID", "vikhyatk/moondream2")
+MOONDREAM_REPO_REVISION = os.getenv("MOONDREAM_REPO_REVISION", "onnx")
+MOONDREAM_MODEL_FILE = os.getenv(
+    "MOONDREAM_MODEL_FILE", "moondream-0_5b-int4.mf.gz"
+)
+MOONDREAM_MODEL_PATH = os.getenv(
+    "MOONDREAM_MODEL_PATH", "models/moondream/moondream-0_5b-int4.mf.gz"
+)
+
 # Legacy single-model settings (still read by older docs)
 SMOLVLM2_ENABLED = _enabled("SMOLVLM2_ENABLED", "true")
 SMOLVLM2_MODEL_PATH = os.getenv("SMOLVLM2_MODEL_PATH", SMOLVLM2_500M_MODEL)

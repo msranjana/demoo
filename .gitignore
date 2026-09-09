@@ -1,5 +1,6 @@
 .env
 logs/
+models/moondream/
 __pycache__/
 *.pyc
 .venv/
