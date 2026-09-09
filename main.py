@@ -1,10 +1,13 @@
 """Entry point: reads the camera once and feeds every attached detection in parallel.
 
-To add a detection:
-  1. create a class in detectors/ that extends BaseDetector
-  2. add one DetectionWrapper line to `build_detections()` below
+Usage:
+  python main.py                    # run all models enabled in .env
+  python main.py smolvlm2-500m      # run one model only
+  python main.py --list             # show available model names
 """
 
+import argparse
+import sys
 import time
 
 import config
@@ -16,77 +19,150 @@ from engines.alert_engine import AlertEngine
 from engines.event_engine import EventEngine
 from services.DetectionWrapper import DetectionWrapper
 from services.RTSPService import RTSPService
+from services.vlm_benchmark import print_summary, reset_stats
+
+MODEL_ALIASES = {
+    "yolo": "yolo",
+    "smolvlm2-500m": "smolvlm2_500m",
+    "smolvlm2_500m": "smolvlm2_500m",
+    "smolvlm2-256m": "smolvlm2_256m",
+    "smolvlm2_256m": "smolvlm2_256m",
+    "internvl3": "internvl3_1b",
+    "internvl3-1b": "internvl3_1b",
+    "internvl3_1b": "internvl3_1b",
+    "gguf": "gguf_smolvlm2_256m",
+    "gguf-smolvlm2-256m": "gguf_smolvlm2_256m",
+    "gguf_smolvlm2_256m": "gguf_smolvlm2_256m",
+    "all": "all",
+}
 
 
-def build_detections():
-    """Return the detections to run. Each VLM runs in its own thread for benchmarking."""
-    detections = []
+def available_models():
+    return sorted(set(MODEL_ALIASES.keys()) - {"all"})
+
+
+def normalize_model_name(name):
+    key = name.strip().lower()
+    if key not in MODEL_ALIASES:
+        options = ", ".join(available_models())
+        raise ValueError(f"unknown model '{name}'. choose one of: {options}, all")
+    return MODEL_ALIASES[key]
+
+
+def make_detection(model_key):
     fps = config.VLM_TEST_FPS
 
+    if model_key == "yolo":
+        return DetectionWrapper("yolo_smoke_fire", config.YOLO_FPS, SmokeAndFireDetector())
+
+    if model_key == "smolvlm2_500m":
+        return DetectionWrapper(
+            "smolvlm2_500m",
+            fps,
+            TransformersVlmSmokeFireDetector(
+                model_id=config.SMOLVLM2_500M_MODEL,
+                label="smolvlm2-500m",
+            ),
+        )
+
+    if model_key == "smolvlm2_256m":
+        return DetectionWrapper(
+            "smolvlm2_256m",
+            fps,
+            TransformersVlmSmokeFireDetector(
+                model_id=config.SMOLVLM2_256M_MODEL,
+                label="smolvlm2-256m",
+            ),
+        )
+
+    if model_key == "internvl3_1b":
+        return DetectionWrapper(
+            "internvl3_1b",
+            fps,
+            TransformersVlmSmokeFireDetector(
+                model_id=config.INTERNVL3_MODEL,
+                label="internvl3-1b",
+            ),
+        )
+
+    if model_key == "gguf_smolvlm2_256m":
+        return DetectionWrapper(
+            "gguf_smolvlm2_256m",
+            fps,
+            GgufVlmSmokeFireDetector(
+                model_id=config.GGUF_MODEL_ID,
+                label="gguf-smolvlm2-256m",
+            ),
+        )
+
+    raise ValueError(f"no factory for model '{model_key}'")
+
+
+def build_detections_from_env():
+    """Return detections based on .env ENABLED flags."""
+    detections = []
+
     if config.YOLO_ENABLED:
-        detections.append(
-            DetectionWrapper(
-                "yolo_smoke_fire",
-                config.YOLO_FPS,
-                SmokeAndFireDetector(),
-            )
-        )
-
+        detections.append(make_detection("yolo"))
     if config.SMOLVLM2_500M_ENABLED:
-        detections.append(
-            DetectionWrapper(
-                "smolvlm2_500m",
-                fps,
-                TransformersVlmSmokeFireDetector(
-                    model_id=config.SMOLVLM2_500M_MODEL,
-                    label="smolvlm2-500m",
-                ),
-            )
-        )
-
+        detections.append(make_detection("smolvlm2_500m"))
     if config.SMOLVLM2_256M_ENABLED:
-        detections.append(
-            DetectionWrapper(
-                "smolvlm2_256m",
-                fps,
-                TransformersVlmSmokeFireDetector(
-                    model_id=config.SMOLVLM2_256M_MODEL,
-                    label="smolvlm2-256m",
-                ),
-            )
-        )
-
+        detections.append(make_detection("smolvlm2_256m"))
     if config.INTERNVL3_ENABLED:
-        detections.append(
-            DetectionWrapper(
-                "internvl3_1b",
-                fps,
-                TransformersVlmSmokeFireDetector(
-                    model_id=config.INTERNVL3_MODEL,
-                    label="internvl3-1b",
-                ),
-            )
-        )
-
+        detections.append(make_detection("internvl3_1b"))
     if config.GGUF_ENABLED:
-        detections.append(
-            DetectionWrapper(
-                "gguf_smolvlm2_256m",
-                fps,
-                GgufVlmSmokeFireDetector(
-                    model_id=config.GGUF_MODEL_ID,
-                    label="gguf-smolvlm2-256m",
-                ),
-            )
-        )
+        detections.append(make_detection("gguf_smolvlm2_256m"))
 
     return detections
 
 
-def main():
+def build_detections(model_name=None):
+    if model_name is None or model_name == "all":
+        return build_detections_from_env()
+    return [make_detection(model_name)]
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="CCTV smoke/fire detection pipeline",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="models: " + ", ".join(available_models()),
+    )
+    parser.add_argument(
+        "model",
+        nargs="?",
+        default=None,
+        help="run a single model (default: all enabled in .env)",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="list available model names and exit",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+
+    if args.list:
+        for name in available_models():
+            print(name)
+        return 0
+
+    model_name = None
+    if args.model:
+        try:
+            model_name = normalize_model_name(args.model)
+        except ValueError as error:
+            say(str(error))
+            return 1
+
     if not config.RTSP_URL:
         say("RTSP_URL is missing, set it in the .env file")
-        return
+        return 1
+
+    reset_stats()
 
     alert_engine = AlertEngine(
         smtp_config={
@@ -101,15 +177,23 @@ def main():
     event_engine = EventEngine(config.LOG_FILE_PATH, alert_engine=alert_engine)
     reader = RTSPService(config.RTSP_URL, reconnect_delay=config.RECONNECT_DELAY)
 
-    detections = build_detections()
-    if not detections:
-        say("No detection attached yet, enable at least one model in .env")
-        return
+    try:
+        detections = build_detections(model_name)
+    except ValueError as error:
+        say(str(error))
+        return 1
 
-    if config.VLM_BENCHMARK_ENABLED:
-        say(f"VLM benchmark mode ON -> {config.VLM_BENCHMARK_LOG_PATH}")
-        if not config.VLM_BENCHMARK_RAISE_ALERTS:
-            say("Alerts disabled during benchmark (set VLM_BENCHMARK_RAISE_ALERTS=true to enable)")
+    if not detections:
+        say("No detection attached. Pass a model name or enable one in .env")
+        return 1
+
+    if model_name and model_name != "all":
+        say(f"running single model: {args.model}")
+    elif config.VLM_BENCHMARK_ENABLED:
+        say(f"benchmark mode ON -> {config.VLM_BENCHMARK_LOG_PATH}")
+
+    if config.VLM_BENCHMARK_ENABLED and not config.VLM_BENCHMARK_RAISE_ALERTS:
+        say("alerts disabled during benchmark (VLM_BENCHMARK_RAISE_ALERTS=true to enable)")
 
     alert_engine.start()
     event_engine.start()
@@ -129,7 +213,10 @@ def main():
         reader.stop()
         event_engine.stop()
         alert_engine.stop()
+        print_summary()
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -9,6 +9,7 @@ import config
 
 _lock = threading.Lock()
 _header_written = False
+_stats = {}
 
 FIELDNAMES = [
     "timestamp",
@@ -23,6 +24,56 @@ FIELDNAMES = [
 ]
 
 
+def reset_stats():
+    global _stats
+    with _lock:
+        _stats = {}
+
+
+def _record_stat(detector_name, latency_ms, error=""):
+    with _lock:
+        entry = _stats.setdefault(
+            detector_name,
+            {"count": 0, "total_ms": 0.0, "errors": 0},
+        )
+        if error:
+            entry["errors"] += 1
+            return
+        entry["count"] += 1
+        entry["total_ms"] += latency_ms
+
+
+def get_summary():
+    with _lock:
+        summary = {}
+        for name, entry in _stats.items():
+            count = entry["count"]
+            summary[name] = {
+                "frames": count,
+                "errors": entry["errors"],
+                "avg_latency_ms": entry["total_ms"] / count if count else 0.0,
+                "total_ms": entry["total_ms"],
+            }
+        return summary
+
+
+def print_summary():
+    summary = get_summary()
+    if not summary:
+        return
+
+    print("\n--- average latency ---")
+    for name, stats in sorted(summary.items()):
+        if stats["frames"]:
+            print(
+                f"{name}: {stats['avg_latency_ms']:.1f} ms avg "
+                f"({stats['frames']} frames, {stats['total_ms']:.0f} ms total)"
+            )
+        if stats["errors"]:
+            print(f"{name}: {stats['errors']} error(s)")
+    print("-----------------------\n")
+
+
 def log_result(
     detector_name,
     model_id,
@@ -33,6 +84,8 @@ def log_result(
     alert_type="",
     error="",
 ):
+    _record_stat(detector_name, latency_ms, error=error)
+
     if not config.VLM_BENCHMARK_ENABLED:
         return
 
