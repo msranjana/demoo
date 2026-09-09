@@ -1,18 +1,31 @@
-"""Smoke and fire detection using Microsoft Florence-2 open-vocabulary detection."""
+"""Smoke and fire detection using Florence-2 open-vocabulary detection."""
 
 import cv2
 import torch
 from PIL import Image
 
 import config
+from detectors.florence2_onnx_runner import Florence2OnnxRunner
 from detectors.vlm_smoke_fire_base import VlmSmokeFireDetectorBase
 
-# Only look for smoke and fire — not general <OD> object detection.
 SMOKE_FIRE_TASK = "<OPEN_VOCABULARY_DETECTION>"
+
+DEFAULT_FLORENCE2_PROMPT = (
+    "Detect all smoke and fire in the image and return their locations in the form of "
+    'coordinates. The format of output should be like {"bbox_2d": [x1, y1, x2, y2], '
+    '"label": "smoke" # or "fire"}.'
+)
 
 
 def _load_florence(model_id):
-    """Load native HF Florence-2 for community models, legacy remote code for microsoft/*."""
+    """Load ONNX weights for onnx-community/*, native HF otherwise."""
+    if model_id.startswith("onnx-community/"):
+        runner = Florence2OnnxRunner(
+            model_id,
+            variant=config.FLORENCE2_ONNX_VARIANT,
+        )
+        return runner.processor, runner
+
     if model_id.startswith("microsoft/"):
         from transformers import AutoModelForCausalLM, AutoProcessor
 
@@ -35,11 +48,12 @@ def _load_florence(model_id):
 
 
 class Florence2SmokeFireDetector(VlmSmokeFireDetectorBase):
-    """Detects only smoke and fire via Florence-2 open-vocabulary detection."""
+    """Detects smoke and fire via Florence-2 open-vocabulary detection."""
 
     def __init__(
         self,
         model_id=None,
+        prompt=None,
         max_new_tokens=None,
         num_beams=3,
         **kwargs,
@@ -50,42 +64,52 @@ class Florence2SmokeFireDetector(VlmSmokeFireDetectorBase):
             **kwargs,
         )
         self.task = SMOKE_FIRE_TASK
-        self.categories = config.FLORENCE2_OV_CATEGORIES
+        self.prompt_text = prompt or config.FLORENCE2_PROMPT
         self.max_new_tokens = max_new_tokens or config.FLORENCE2_MAX_NEW_TOKENS
         self.num_beams = num_beams
         self._processor = None
         self._model = None
+        self._use_onnx = False
 
     def on_start(self):
         self.log(
             f"loading {self.label} from {self.model_id} "
-            f"(categories={self.categories})..."
+            f"(prompt={self.prompt_text[:80]}...)..."
         )
         self._processor, self._model = _load_florence(self.model_id)
-        self._model.eval()
-        self.log(f"model loaded: {self.label}")
+        self._use_onnx = isinstance(self._model, Florence2OnnxRunner)
+        if not self._use_onnx:
+            self._model.eval()
+        self.log(f"model loaded: {self.label} ({'onnx' if self._use_onnx else 'pytorch'})")
 
     def _build_task_prompt(self):
-        return self.task + self.categories
+        return self.task + self.prompt_text
 
     def _ask(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb)
         prompt = self._build_task_prompt()
 
-        inputs = self._processor(text=prompt, images=pil_image, return_tensors="pt")
-
-        with torch.no_grad():
-            generated_ids = self._model.generate(
-                **inputs,
+        if self._use_onnx:
+            generated_text = self._model.generate(
+                pil_image,
+                prompt,
                 max_new_tokens=self.max_new_tokens,
-                do_sample=False,
-                num_beams=self.num_beams,
             )
+        else:
+            inputs = self._processor(text=prompt, images=pil_image, return_tensors="pt")
 
-        generated_text = self._processor.batch_decode(
-            generated_ids, skip_special_tokens=False
-        )[0]
+            with torch.no_grad():
+                generated_ids = self._model.generate(
+                    **inputs,
+                    max_new_tokens=self.max_new_tokens,
+                    do_sample=False,
+                    num_beams=self.num_beams,
+                )
+
+            generated_text = self._processor.batch_decode(
+                generated_ids, skip_special_tokens=False
+            )[0]
 
         try:
             parsed = self._processor.post_process_generation(
@@ -102,12 +126,14 @@ class Florence2SmokeFireDetector(VlmSmokeFireDetectorBase):
         if not isinstance(task_data, dict):
             return []
 
-        labels = task_data.get("labels") or []
+        labels = task_data.get("bboxes_labels") or task_data.get("labels") or []
         normalized = []
         for label in labels:
             text = str(label).strip().lower()
-            if text in ("smoke", "fire"):
-                normalized.append(text)
+            if "fire" in text:
+                normalized.append("fire")
+            elif "smoke" in text:
+                normalized.append("smoke")
         return normalized
 
     def _format_response(self, parsed, generated_text):

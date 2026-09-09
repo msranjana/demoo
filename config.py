@@ -68,10 +68,15 @@ QWEN35_ENABLED = _enabled("QWEN35_ENABLED", "false")
 QWEN35_MODEL = os.getenv("QWEN35_MODEL", "Qwen/Qwen3.5-0.8B")
 
 FLORENCE2_ENABLED = _enabled("FLORENCE2_ENABLED", "false")
-FLORENCE2_MODEL = os.getenv(
-    "FLORENCE2_MODEL", "florence-community/Florence-2-base-ft"
+FLORENCE2_MODEL = os.getenv("FLORENCE2_MODEL", "onnx-community/Florence-2-base")
+FLORENCE2_PROMPT = os.getenv(
+    "FLORENCE2_PROMPT",
+    "Detect all smoke and fire in the image and return their locations in the form of "
+    'coordinates. The format of output should be like {"bbox_2d": [x1, y1, x2, y2], '
+    '"label": "smoke" # or "fire"}.',
 )
 FLORENCE2_OV_CATEGORIES = os.getenv("FLORENCE2_OV_CATEGORIES", "smoke,fire")
+FLORENCE2_ONNX_VARIANT = os.getenv("FLORENCE2_ONNX_VARIANT", "")
 FLORENCE2_MAX_NEW_TOKENS = int(os.getenv("FLORENCE2_MAX_NEW_TOKENS", "256"))
 
 # Legacy single-model settings (still read by older docs)
