@@ -16,6 +16,7 @@ from detectors.florence2_smoke_fire_detector import Florence2SmokeFireDetector
 from detectors.gguf_vlm_smoke_fire_detector import GgufVlmSmokeFireDetector
 from detectors.moondream_onnx_smoke_fire_detector import MoondreamOnnxSmokeFireDetector
 from detectors.rfdetr_smoke_fire_detector import RfdetrSmokeFireDetector
+from detectors.rfdetr_smoke_fire_small_detector import RfdetrSmokeFireSmallDetector
 from detectors.smoke_and_fire_detector import SmokeAndFireDetector
 from detectors.transformers_vlm_smoke_fire_detector import TransformersVlmSmokeFireDetector
 from engines.alert_engine import AlertEngine
@@ -51,6 +52,8 @@ MODEL_ALIASES = {
     "rfdetr": "rfdetr_nano",
     "rfdetr-nano": "rfdetr_nano",
     "rfdetr_nano": "rfdetr_nano",
+    "rfdetr-small": "rfdetr_small",
+    "rfdetr_small": "rfdetr_small",
     "all": "all",
 }
 
@@ -145,6 +148,13 @@ def make_detection(model_key):
             RfdetrSmokeFireDetector(),
         )
 
+    if model_key == "rfdetr_small":
+        return DetectionWrapper(
+            "rfdetr_small",
+            config.RFDETR_SMALL_FPS,
+            RfdetrSmokeFireSmallDetector(),
+        )
+
     raise ValueError(f"no factory for model '{model_key}'")
 
 
@@ -170,6 +180,8 @@ def build_detections_from_env():
         detections.append(make_detection("florence2_base"))
     if config.RFDETR_ENABLED:
         detections.append(make_detection("rfdetr_nano"))
+    if config.RFDETR_SMALL_ENABLED:
+        detections.append(make_detection("rfdetr_small"))
 
     return detections
 

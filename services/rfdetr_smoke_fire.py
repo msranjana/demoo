@@ -1,35 +1,16 @@
-"""RF-DETR Nano smoke/fire detection helpers."""
+"""RF-DETR smoke/fire detection helpers (nano, small, ...)."""
 
 import json
 import time
-from pathlib import Path
 
 import cv2
 import numpy as np
 import supervision as sv
-from rfdetr import RFDETRNano
 
 import config
+from services.rfdetr_models import load_rfdetr_model, resolve_checkpoint_path
 
 SMOKE_FIRE_LABELS = {"smoke", "fire"}
-
-
-def load_rfdetr_model(device=None, checkpoint_path=None):
-    """Load RF-DETR Nano, optionally from a fire/smoke fine-tuned checkpoint."""
-    device = device or config.RFDETR_DEVICE
-    checkpoint_path = checkpoint_path or config.RFDETR_MODEL_PATH
-
-    if checkpoint_path:
-        path = Path(checkpoint_path)
-        if not path.is_file():
-            raise FileNotFoundError(
-                f"RF-DETR checkpoint not found: {checkpoint_path}. "
-                "Fine-tune on a smoke/fire dataset and set RFDETR_MODEL_PATH."
-            )
-        return RFDETRNano.from_checkpoint(str(path), device=device)
-
-    model = RFDETRNano(device=device)
-    return model
 
 
 def class_name_for_detection(detections, index, model):
@@ -154,14 +135,19 @@ def run_video(
     threshold=None,
     device=None,
     checkpoint_path=None,
+    model_size="nano",
     out_path=None,
     max_frames=None,
     every=None,
     show=False,
     results_path=None,
 ):
-    """Process a video/RTSP source for smoke/fire with RF-DETR Nano."""
-    model = load_rfdetr_model(device=device, checkpoint_path=checkpoint_path)
+    """Process a video/RTSP source for smoke/fire with RF-DETR."""
+    model = load_rfdetr_model(
+        size=model_size,
+        device=device,
+        checkpoint_path=checkpoint_path,
+    )
     cap = open_video_source(source)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
 
@@ -228,12 +214,12 @@ def run_video(
     print(f"Avg latency: {latency_stats['avg_ms']:.1f} ms")
 
     results = {
-        "model": "rfdetr-nano-smoke-fire",
+        "model": f"rfdetr-{model_size}-smoke-fire",
         "source": source,
         "processed_frames": processed_frames,
         "frame_counts": frame_counts,
         "latency_ms": latency_stats,
-        "checkpoint": checkpoint_path or config.RFDETR_MODEL_PATH or "coco-pretrained",
+        "checkpoint": checkpoint_path or resolve_checkpoint_path(model_size) or "coco-pretrained",
     }
 
     if results_path:

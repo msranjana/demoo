@@ -33,12 +33,16 @@ VLM_BENCHMARK_RAISE_ALERTS = _enabled("VLM_BENCHMARK_RAISE_ALERTS", "false")
 YOLO_ENABLED = _enabled("YOLO_ENABLED", "true")
 YOLO_FPS = float(os.getenv("YOLO_FPS", "2"))
 
-# RF-DETR Nano — smoke/fire detection (requires fine-tuned checkpoint)
+# RF-DETR — smoke/fire detection (requires fine-tuned checkpoints)
 RFDETR_ENABLED = _enabled("RFDETR_ENABLED", "false")
 RFDETR_MODEL_PATH = os.getenv("RFDETR_MODEL_PATH", "")
 RFDETR_THRESHOLD = float(os.getenv("RFDETR_THRESHOLD", "0.5"))
 RFDETR_DEVICE = os.getenv("RFDETR_DEVICE", "cpu")
 RFDETR_FPS = float(os.getenv("RFDETR_FPS", "5"))
+
+RFDETR_SMALL_ENABLED = _enabled("RFDETR_SMALL_ENABLED", "false")
+RFDETR_SMALL_MODEL_PATH = os.getenv("RFDETR_SMALL_MODEL_PATH", "")
+RFDETR_SMALL_FPS = float(os.getenv("RFDETR_SMALL_FPS", str(RFDETR_FPS)))
 
 # Per-model toggles for parallel latency/accuracy testing
 SMOLVLM2_500M_ENABLED = _enabled("SMOLVLM2_500M_ENABLED", "true")

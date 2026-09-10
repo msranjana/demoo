@@ -9,6 +9,7 @@ from detectors.florence2_smoke_fire_detector import Florence2SmokeFireDetector
 from detectors.gguf_vlm_smoke_fire_detector import GgufVlmSmokeFireDetector
 from detectors.moondream_onnx_smoke_fire_detector import MoondreamOnnxSmokeFireDetector
 from detectors.rfdetr_smoke_fire_detector import RfdetrSmokeFireDetector
+from detectors.rfdetr_smoke_fire_small_detector import RfdetrSmokeFireSmallDetector
 from detectors.smoke_and_fire_detector import SmokeAndFireDetector
 from services.eval_metrics import findings_to_label
 from services.rfdetr_smoke_fire import predict_frame
@@ -17,6 +18,7 @@ from detectors.transformers_vlm_smoke_fire_detector import TransformersVlmSmokeF
 EVAL_ALL_MODELS = [
     "yolo",
     "rfdetr_nano",
+    "rfdetr_small",
     "florence2_base",
     "moondream_onnx",
     "smolvlm2_500m",
@@ -61,9 +63,9 @@ class YoloEvaluator(FrameEvaluator):
 
 
 class RfdetrEvaluator(FrameEvaluator):
-    def __init__(self, detector=None):
+    def __init__(self, detector=None, name=None):
         self.detector = detector or RfdetrSmokeFireDetector()
-        self.name = "rfdetr_nano"
+        self.name = name or self.detector.model_label.replace("-", "_")
 
     def setup(self):
         self.detector.on_start()
@@ -99,7 +101,10 @@ def make_evaluator(model_key):
         return YoloEvaluator()
 
     if model_key == "rfdetr_nano":
-        return RfdetrEvaluator()
+        return RfdetrEvaluator(RfdetrSmokeFireDetector(), "rfdetr_nano")
+
+    if model_key == "rfdetr_small":
+        return RfdetrEvaluator(RfdetrSmokeFireSmallDetector(), "rfdetr_small")
 
     if model_key == "florence2_base":
         return VlmEvaluator(Florence2SmokeFireDetector(), "florence2_base")

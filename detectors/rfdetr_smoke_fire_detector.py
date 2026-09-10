@@ -1,36 +1,45 @@
-"""Smoke and fire detection using RF-DETR Nano."""
+"""Smoke and fire detection using RF-DETR (nano, small, ...)."""
 
 import time
 
 import config
 from detectors.base_detector import BaseDetector
 from engines.alert_engine import AlertType
-from services.rfdetr_smoke_fire import annotate_frame, load_rfdetr_model, predict_frame
+from services.rfdetr_models import load_rfdetr_model, resolve_checkpoint_path
+from services.rfdetr_smoke_fire import annotate_frame, predict_frame
 from services.vlm_benchmark import log_result
 
 
 class RfdetrSmokeFireDetector(BaseDetector):
-    """Detects smoke and fire via RF-DETR Nano (requires a fine-tuned checkpoint)."""
+    """Detects smoke and fire via RF-DETR (requires a fine-tuned checkpoint)."""
 
     def __init__(
         self,
+        model_size="nano",
+        model_label=None,
         threshold=None,
         device=None,
         checkpoint_path=None,
         alert_cooldown=30,
     ):
         super().__init__()
+        self.model_size = model_size
+        self.model_label = model_label or f"rfdetr-{model_size}"
         self.threshold = threshold if threshold is not None else config.RFDETR_THRESHOLD
         self.device = device if device is not None else config.RFDETR_DEVICE
-        self.checkpoint_path = checkpoint_path or config.RFDETR_MODEL_PATH
+        self.checkpoint_path = checkpoint_path or resolve_checkpoint_path(model_size)
         self.alert_cooldown = alert_cooldown
         self._model = None
         self._last_alert_at = {}
 
     def on_start(self):
-        self._model = load_rfdetr_model(device=self.device, checkpoint_path=self.checkpoint_path)
+        self._model = load_rfdetr_model(
+            size=self.model_size,
+            device=self.device,
+            checkpoint_path=self.checkpoint_path,
+        )
         source = self.checkpoint_path or "coco-pretrained (smoke/fire unlikely without fine-tuning)"
-        self.log(f"RF-DETR Nano loaded from {source}")
+        self.log(f"RF-DETR {self.model_size} loaded from {source}")
 
     def process(self, frame, frame_number=0):
         started_at = time.perf_counter()
@@ -48,7 +57,7 @@ class RfdetrSmokeFireDetector(BaseDetector):
                 alert_type = AlertType.CRITICAL if "fire" in finding_set else AlertType.WARNING
             log_result(
                 self.name,
-                self.checkpoint_path or "rfdetr-nano",
+                self.checkpoint_path or self.model_label,
                 frame_number,
                 latency_ms,
                 response=self._build_message(findings) if findings else "none",
@@ -56,7 +65,7 @@ class RfdetrSmokeFireDetector(BaseDetector):
                 alert_type=alert_type,
             )
             self.log(
-                f"benchmark rfdetr: {latency_ms:.0f}ms | "
+                f"benchmark {self.model_label}: {latency_ms:.0f}ms | "
                 f"findings={sorted(finding_set) or ['none']}"
             )
 
