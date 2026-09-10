@@ -15,6 +15,7 @@ from console import say
 from detectors.florence2_smoke_fire_detector import Florence2SmokeFireDetector
 from detectors.gguf_vlm_smoke_fire_detector import GgufVlmSmokeFireDetector
 from detectors.moondream_onnx_smoke_fire_detector import MoondreamOnnxSmokeFireDetector
+from detectors.rfdetr_smoke_fire_detector import RfdetrSmokeFireDetector
 from detectors.smoke_and_fire_detector import SmokeAndFireDetector
 from detectors.transformers_vlm_smoke_fire_detector import TransformersVlmSmokeFireDetector
 from engines.alert_engine import AlertEngine
@@ -47,6 +48,9 @@ MODEL_ALIASES = {
     "florence-2-base": "florence2_base",
     "florence2-base": "florence2_base",
     "florence2_base": "florence2_base",
+    "rfdetr": "rfdetr_nano",
+    "rfdetr-nano": "rfdetr_nano",
+    "rfdetr_nano": "rfdetr_nano",
     "all": "all",
 }
 
@@ -134,6 +138,13 @@ def make_detection(model_key):
             Florence2SmokeFireDetector(),
         )
 
+    if model_key == "rfdetr_nano":
+        return DetectionWrapper(
+            "rfdetr_nano",
+            config.RFDETR_FPS,
+            RfdetrSmokeFireDetector(),
+        )
+
     raise ValueError(f"no factory for model '{model_key}'")
 
 
@@ -157,6 +168,8 @@ def build_detections_from_env():
         detections.append(make_detection("qwen35_0_8b"))
     if config.FLORENCE2_ENABLED:
         detections.append(make_detection("florence2_base"))
+    if config.RFDETR_ENABLED:
+        detections.append(make_detection("rfdetr_nano"))
 
     return detections
 

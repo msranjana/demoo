@@ -8,12 +8,15 @@ import config
 from detectors.florence2_smoke_fire_detector import Florence2SmokeFireDetector
 from detectors.gguf_vlm_smoke_fire_detector import GgufVlmSmokeFireDetector
 from detectors.moondream_onnx_smoke_fire_detector import MoondreamOnnxSmokeFireDetector
+from detectors.rfdetr_smoke_fire_detector import RfdetrSmokeFireDetector
 from detectors.smoke_and_fire_detector import SmokeAndFireDetector
-from detectors.transformers_vlm_smoke_fire_detector import TransformersVlmSmokeFireDetector
 from services.eval_metrics import findings_to_label
+from services.rfdetr_smoke_fire import predict_frame
+from detectors.transformers_vlm_smoke_fire_detector import TransformersVlmSmokeFireDetector
 
 EVAL_ALL_MODELS = [
     "yolo",
+    "rfdetr_nano",
     "florence2_base",
     "moondream_onnx",
     "smolvlm2_500m",
@@ -57,6 +60,23 @@ class YoloEvaluator(FrameEvaluator):
         return label, response, latency_ms
 
 
+class RfdetrEvaluator(FrameEvaluator):
+    def __init__(self, detector=None):
+        self.detector = detector or RfdetrSmokeFireDetector()
+        self.name = "rfdetr_nano"
+
+    def setup(self):
+        self.detector.on_start()
+
+    def predict(self, frame):
+        started = time.perf_counter()
+        _, findings, _ = predict_frame(self.detector._model, frame, self.detector.threshold)
+        latency_ms = (time.perf_counter() - started) * 1000
+        label = findings_to_label(set(findings.keys()))
+        response = self.detector._build_message(findings) if findings else "none"
+        return label, response, latency_ms
+
+
 class VlmEvaluator(FrameEvaluator):
     def __init__(self, detector, name):
         self.detector = detector
@@ -77,6 +97,9 @@ class VlmEvaluator(FrameEvaluator):
 def make_evaluator(model_key):
     if model_key == "yolo":
         return YoloEvaluator()
+
+    if model_key == "rfdetr_nano":
+        return RfdetrEvaluator()
 
     if model_key == "florence2_base":
         return VlmEvaluator(Florence2SmokeFireDetector(), "florence2_base")
